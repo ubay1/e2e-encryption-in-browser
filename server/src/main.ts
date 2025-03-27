@@ -125,8 +125,8 @@ app.post("/test-enkrip", async (req, res) => {
     encodedData
   );
 
-  const exportedKey = await exportKey(keyForEnc);
-  res.set("key", exportedKey.k);
+  // const exportedKey = await exportKey(keyForEnc);
+  // res.set("key", exportedKey.k);
   res.writeHead(200, "ok", {
     "Content-Type": "application/octet-stream",
   });
@@ -154,7 +154,7 @@ app.post("/test-enkripsi", async (req, res) => {
 
   console.log("encryptedData = ", encryptedData);
 
-  res.set("key", encryptedData.key);
+  // res.set("key", encryptedData.key);
   res.writeHead(200, "ok", {
     "Content-Type": "application/octet-stream",
   });
