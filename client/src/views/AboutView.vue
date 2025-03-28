@@ -4,7 +4,7 @@
 
     <div v-if="decryptedParam">
       <h3>Parameter yang Didekripsi:</h3>
-      <p style="overflow-wrap: anywhere">{{ decryptedParam }}</p>
+      <p style="overflow-wrap: anywhere; color: #fff">{{ decryptedParam }}</p>
     </div>
 
     <div v-else-if="errorMessage">
