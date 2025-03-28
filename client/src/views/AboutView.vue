@@ -4,7 +4,7 @@
 
     <div v-if="decryptedParam">
       <h3>Parameter yang Didekripsi:</h3>
-      <p>{{ decryptedParam }}</p>
+      <p style="overflow-wrap: anywhere">{{ decryptedParam }}</p>
     </div>
 
     <div v-else-if="errorMessage">
@@ -46,21 +46,8 @@ onMounted(async () => {
   if (!encryptedParam) return
 
   try {
-    // 1. Decode base64 dengan error handling
-    // const decodedString = safeAtob(encryptedParam)
-    // if (!decodedString) {
-    //   throw new Error('Format data tidak valid (base64 error)')
-    // }
-
-    // 2. Parse JSON
-    // const encryptedData = JSON.parse(decodedString) as {
-    //   e: string // encrypted data
-    //   n: string // nonce
-    //   k: string // sender's short key
-    // }
     const decoded = JSON.parse(atob(decodeURIComponent(encryptedParam)))
 
-    // 2. Siapkan encrypted data
     const encryptedData = {
       encrypted: decoded.e,
       iv: decoded.iv,
@@ -69,37 +56,11 @@ onMounted(async () => {
     }
     // 3. Dekripsi
     decryptedParam.value = await decryptLargeData(encryptedData, (await getKeyPair()).privateKey)
-
-    // 3. Dapatkan full public key dari short key
-    // (Di aplikasi nyata, ini akan query ke backend)
-    // const senderPublicKey = await getFullKeyFromShort(encryptedData.k)
-
-    // // 4. Siapkan payload untuk dekripsi
-    // const decryptionPayload = {
-    //   encrypted: encryptedData.e,
-    //   nonce: encryptedData.n,
-    //   iv: encryptedData.n,
-    //   senderPublicKey,
-    // }
-
-    // // 5. Dekripsi data
-    // decryptedParam.value = await decryptData(decryptionPayload)
   } catch (error) {
     console.error('Full decryption error:', error)
     errorMessage.value = 'Gagal mendekripsi. Pastikan URL tidak dimodifikasi.'
   }
 })
-
-// Fungsi untuk mendapatkan full key dari short key
-// (Implementasi nyata akan query ke backend/database)
-const getFullKeyFromShort = async (shortKey: string): Promise<JsonWebKey> => {
-  // Di aplikasi nyata:
-  // return await fetch(`/api/keys/${shortKey}`).then(res => res.json())
-
-  // Untuk demo, gunakan key lokal
-  const keys = await getKeyPair()
-  return keys.publicKey
-}
 </script>
 
 <style>

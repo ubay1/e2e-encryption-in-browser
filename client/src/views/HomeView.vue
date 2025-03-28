@@ -29,12 +29,17 @@
       <h3>Payload Terenkripsi:</h3>
       <pre>{{ encryptedPayloadAsString }}</pre>
     </div>
+    <div v-if="decryptedPayloadAsString">
+      <h3>Payload Terdekrip:</h3>
+      <pre>{{ decryptedPayloadAsString }}</pre>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import {
   decryptData,
+  decryptLargeData,
   encryptData,
   encryptLargeData,
   expandShortKey,
@@ -46,12 +51,14 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
 const secretParam = ref('')
 const recipientPublicKeyJwk = ref('')
 const encryptedPayload = ref<EncryptedData | null>(null)
 const encryptedPayloadAsString = ref<string | null>(null)
 const ownPublicKey = ref('')
 const recipientShortKey = ref('')
+const decryptedPayloadAsString = ref(null)
 
 // Fungsi untuk memendekkan public key
 const shortenPublicKey = (publicKey: JsonWebKey): string => {
@@ -68,16 +75,56 @@ const getShortKey = async (): Promise<string> => {
 }
 
 // Fungsi generate short key (simpan di utils jika perlu digunakan di banyak tempat)
-const generateShortKey = (publicKey: JsonWebKey): string => {
-  return btoa(JSON.stringify(publicKey)).substr(0, 12)
+// const generateShortKey = (publicKey: JsonWebKey): string => {
+//   return btoa(JSON.stringify(publicKey)).substr(0, 12)
+// }
+const generateShortKey = async (publicKey: JsonWebKey): Promise<string> => {
+  try {
+    // 1. Gunakan bagian penting dari public key
+    const keyMaterial = {
+      kty: publicKey.kty,
+      n: publicKey.n,
+      e: publicKey.e,
+      timestamp: Date.now(), // Untuk memastikan unik
+    }
+
+    // 2. Buat hash
+    const hashBuffer = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(JSON.stringify(keyMaterial)),
+    )
+
+    // 3. Konversi ke base64 url-safe pendek
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return btoa(String.fromCharCode(...hashArray))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+      .substring(0, 10) // 10 karakter url-safe
+  } catch (error) {
+    console.error('Key generation error:', error)
+    // Fallback ke metode sederhana jika Web Crypto tidak tersedia
+    return btoa(JSON.stringify(publicKey)).substring(0, 12)
+  }
 }
 
-const getOwnShortKey = async () => {
+const decryptDatas = async (encryptedParam: string) => {
   try {
-    const keys = await getKeyPair()
-    recipientShortKey.value = generateShortKey(keys.publicKey)
+    const decoded = JSON.parse(atob(decodeURIComponent(encryptedParam)))
+
+    const encryptedData = {
+      encrypted: decoded.e,
+      iv: decoded.iv,
+      senderPublicKey: decoded.k,
+      encryptedKey: decoded.ek,
+    }
+    // 3. Dekripsi
+    decryptedPayloadAsString.value = await decryptLargeData(
+      encryptedData,
+      (await getKeyPair()).privateKey,
+    )
   } catch (error) {
-    console.error('Error getting key:', error)
+    console.error('Full decryption error:', error)
   }
 }
 
@@ -88,8 +135,6 @@ const navigateToAbout = async () => {
   }
 
   try {
-    // Parse recipient public key
-    // 1. Dapatkan full public key dari short key
     const recipientPublicKey = await expandShortKey(recipientShortKey.value)
 
     // Enkripsi parameter
@@ -108,6 +153,8 @@ const navigateToAbout = async () => {
     const encryptedString = encodeURIComponent(btoa(JSON.stringify(payload)))
     encryptedPayloadAsString.value = encryptedString
 
+    decryptDatas(encryptedString)
+
     // Navigasi ke About dengan parameter terenkripsi
     router.push({
       name: 'about',
@@ -125,7 +172,8 @@ const getOwnPublicKey = async () => {
   try {
     const keys = await getKeyPair()
     ownPublicKey.value = JSON.stringify(keys.publicKey, null, 2)
-    recipientShortKey.value = shortenPublicKey(keys.publicKey)
+    // recipientShortKey.value = shortenPublicKey(keys.publicKey)
+    recipientShortKey.value = await generateShortKey(keys.publicKey)
     recipientPublicKeyJwk.value = recipientShortKey.value
   } catch (error) {
     console.error('Error getting public key:', error)
